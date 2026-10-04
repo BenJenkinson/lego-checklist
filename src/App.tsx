@@ -1,10 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import type {
   LegoSetPart,
   LegoSetPartsResponse,
 } from "./rebrickable-api/types";
+import { generateBricklinkXmlFromRebrickableParts } from "./bricklink-xml/generate";
+import { downloadParts } from "./utils/export";
+import type { LegoSetPartWithFilledQuantity } from "./bricklink-xml/types";
 
-const API_KEY = import.meta.env.REACT_APP_REBRICKABLE_API_KEY;
+const API_KEY = import.meta.env.VITE_REBRICKABLE_API_KEY;
 const API_BASE_URL = "https://rebrickable.com/api/v3";
 
 function App() {
@@ -204,14 +207,23 @@ function App() {
     (sum, count) => sum + count,
     0,
   );
+
+  /** The total number of parts */
   const totalCount = parts.reduce((sum, part) => sum + part.quantity, 0);
+
+  /** The total number of unique parts, considering both part number and color */
+  const totalUniquePartsCount = parts.reduce(
+    (set, part) => set.add(part.part.part_num + part.color.id),
+    new Set(),
+  ).size;
+
   const partsCompleted = parts.map((part) => {
     const itemKey = `${part.part.part_num}-${part.color.id}`;
     const partCheckedCount = checkedItems[itemKey] || 0;
     const allChecked = partCheckedCount === part.quantity;
     return { ...part, allChecked };
   });
-  // eslint-disable-next-line
+
   const sortedParts = partsCompleted.sort((a, b) => {
     if (a.allChecked === b.allChecked) {
       return 0;
@@ -225,6 +237,27 @@ function App() {
 
     return 0;
   });
+
+  /** The list of parts with their filled quantities based on the checked items in local storage */
+  const exportableParts = useMemo(() => {
+    return parts.map<LegoSetPartWithFilledQuantity>((part) => {
+      const itemKey = `${part.part.part_num}-${part.color.id}`;
+      const partCheckedCount = checkedItems[itemKey] || 0;
+      return { ...part, quantityFilled: partCheckedCount };
+    });
+  }, [parts, checkedItems]);
+
+  /** Callback to handle exporting the parts list as a downloadable XML file */
+  const handleExportDownload = useCallback(() => {
+    downloadParts(`${setName}.xml`, exportableParts);
+  }, [exportableParts]);
+
+  /** Callback to handle copying the parts list as XML to the clipboard */
+  const handleExportCopy = useCallback(() => {
+    navigator.clipboard.writeText(
+      generateBricklinkXmlFromRebrickableParts(exportableParts),
+    );
+  }, [exportableParts]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -275,7 +308,8 @@ function App() {
                 </p>
               </div>
               <span className="text-sm font-medium text-gray-600 whitespace-nowrap">
-                {checkedCount} / {totalCount} parts
+                {checkedCount} / {totalCount} parts ({totalUniquePartsCount}{" "}
+                unique parts)
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
@@ -399,6 +433,27 @@ function App() {
               </ol>
             </div>
           )}
+
+        {/* Export */}
+        <div className="mb-6 p-4 bg-white rounded-lg shadow flex justify-between items-center gap-2 mt-6">
+          <span>Export to Bricklink XML</span>
+          <div className="flex justify-end items-center gap-2">
+            <button
+              type="button"
+              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={handleExportDownload}
+            >
+              Download
+            </button>
+            <button
+              type="button"
+              className="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+              onClick={handleExportCopy}
+            >
+              Copy to Clipboard
+            </button>
+          </div>
+        </div>
 
         {/* Footer */}
         <footer className="mt-12 pt-8 pb-4 border-t border-gray-200 text-center text-sm text-gray-600">
