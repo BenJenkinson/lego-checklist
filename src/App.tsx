@@ -1,15 +1,19 @@
 import { useState, useEffect } from "react";
+import type {
+  LegoSetPart,
+  LegoSetPartsResponse,
+} from "./rebrickable-api/types";
 
 const API_KEY = import.meta.env.REACT_APP_REBRICKABLE_API_KEY;
 const API_BASE_URL = "https://rebrickable.com/api/v3";
 
 function App() {
-  const [setNumber, setSetNumber] = useState("");
-  const [currentSetNumber, setCurrentSetNumber] = useState("");
-  const [setName, setSetName] = useState("");
-  const [parts, setParts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [setNumber, setSetNumber] = useState<string>("");
+  const [currentSetNumber, setCurrentSetNumber] = useState<string>("");
+  const [setName, setSetName] = useState<string>("");
+  const [parts, setParts] = useState<LegoSetPart[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
   const [checkedItems, setCheckedItems] = useState<Record<string, number>>({});
 
   // Load set from URL on mount
@@ -38,7 +42,7 @@ function App() {
   }, [currentSetNumber, parts]);
 
   const fetchAllParts = async (setNum: string) => {
-    let allParts = [];
+    let allParts: LegoSetPart[] = [];
     let page = 1;
     let hasMore = true;
 
@@ -61,7 +65,7 @@ function App() {
         throw new Error(`Error fetching parts: ${response.statusText}`);
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as LegoSetPartsResponse;
       allParts = [...allParts, ...data.results];
 
       // Check if there's a next page
@@ -72,7 +76,7 @@ function App() {
     return allParts;
   };
 
-  const loadSet = async (setNum) => {
+  const loadSet = async (setNum: string) => {
     if (!setNum.trim()) {
       setError("Please enter a set number");
       return;
@@ -151,7 +155,9 @@ function App() {
       const newUrl = `${window.location.pathname}?set_id=${encodeURIComponent(normalizedSetNum)}`;
       window.history.pushState({}, "", newUrl);
     } catch (err) {
-      setError(err.message);
+      if (err instanceof Error) {
+        setError(err.message);
+      }
       setCurrentSetNumber("");
       setSetName("");
     } finally {
@@ -159,12 +165,12 @@ function App() {
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     await loadSet(setNumber);
   };
 
-  const handleIncrement = (part) => {
+  const handleIncrement = (part: LegoSetPart) => {
     const itemKey = `${part.part.part_num}-${part.color.id}`;
     const storageKey = `lego-checklist-${currentSetNumber}-${part.part.part_num}-${part.color.id}`;
     const currentCount = checkedItems[itemKey] || 0;
@@ -179,7 +185,7 @@ function App() {
     }
   };
 
-  const handleDecrement = (part) => {
+  const handleDecrement = (part: LegoSetPart) => {
     const itemKey = `${part.part.part_num}-${part.color.id}`;
     const storageKey = `lego-checklist-${currentSetNumber}-${part.part.part_num}-${part.color.id}`;
     const currentCount = checkedItems[itemKey] || 0;
@@ -216,6 +222,8 @@ function App() {
     if (a.allChecked < b.allChecked) {
       return -1;
     }
+
+    return 0;
   });
 
   return (
@@ -306,14 +314,15 @@ function App() {
                   >
                     <div className="flex items-start gap-4">
                       {/* Part Image */}
-                      <div className="flex-shrink-0 w-20 h-20 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
+                      <div className="shrink-0 w-20 h-20 bg-gray-100 rounded flex items-center justify-center overflow-hidden">
                         {part.part.part_img_url ? (
                           <img
                             src={part.part.part_img_url}
                             alt={part.part.name}
                             className="max-w-full max-h-full object-contain"
                             onError={(e) => {
-                              e.target.style.display = "none";
+                              (e.target as HTMLImageElement).style.display =
+                                "none";
                             }}
                           />
                         ) : (
